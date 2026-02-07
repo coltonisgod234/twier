@@ -1,0 +1,36 @@
+<script>
+async function signUp(username, password) {
+    const response = await fetch("/user/add", {
+        method: "POST",
+        body : JSON.stringify({username: username, passwd: password}),
+        headers: {
+            "Content-Type": "application/json"
+        }
+    })
+
+    return response
+}
+
+async function do_signup() {
+    let r = await signUp(
+        document.getElementById('username').value,
+        document.getElementById('password').value
+    );
+
+    let status = await r.status;
+    let jso = await r.json;
+    let err = jso.error
+
+    if (status != 200) {
+        document.write(`error during signup, ${status}, ${err}`)
+    } else {
+        window.location = "/"
+    }
+}
+</script>
+
+<div>
+    <input type="text" id="username" placeholder="username" />
+    <input type="password" id="password" placeholder="password" />
+    <button onclick="do_signup()">sign up</button>
+</div>

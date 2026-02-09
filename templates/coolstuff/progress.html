@@ -1,0 +1,17 @@
+<script defer>
+// local computation
+
+</script>
+
+<title>progres</title>
+<body>
+    {% include "base/global.html" with context %}
+    <progress id="our_progress" value="{{ progress.current_posts }}" max="{{ progress.max_posts }}"></progress>
+    <p>There are {{ progress.current_posts }} posts on the platform, which is about {{ progress.percent_scientific_approximate }} per cent of all theoretically possible posts</p>
+</body>
+
+<style>
+#our_progress {
+    width: 100%;
+}
+</style>

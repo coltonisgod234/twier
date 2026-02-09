@@ -4,20 +4,22 @@
         <title>twier -hbsocalmdav</title>
     </head>
     <body>
+        {% include "base/global.html" with context %}
         <h1>welcome to twier</h1>
-        <table>
-            <tr>
-                <td>
-                    <a href="signup">sing up</a>
-                </td>
-                <td>
-                    <a href="login">logging</a>
-                </td>
-            </tr>
-        </table>
-        <p>posts of all time:</p>
-        <div>
-            {{posts}}
+        <p>posts of <b>all</b> time:</p>
+        <grid id="post_containers">
+            {% for post in posts %}
+                {% include "base/post.html" with context %}
+            {% endfor %}
         </div>
     </body>
 </html>
+
+<style>
+#post_containers {
+    display: grid;
+    /* grid-template-columns: repeat(5, auto); */
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    row-gap: 0;
+}
+</style>

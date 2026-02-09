@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<script defer>
+async function page_do_login() {
+    let r = await do_website_login(
+        document.getElementById('username').value,
+        document.getElementById('password').value
+    )
+}
+</script>
+
+<body>
+    {% include "base/global.html" with context %}
+
+    <div>
+        <input type="text" id="username" placeholder="username" /><br/>
+        <input type="password" id="password" placeholder="password" /><br/>
+        <button onclick="page_do_login()">log in</button>
+    </div>
+</body>

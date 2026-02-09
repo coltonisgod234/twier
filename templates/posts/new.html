@@ -1,0 +1,35 @@
+<!-- requires post.js, cookie.js -->
+
+<script>
+async function do_make_post() {
+    let val = document.getElementById("post_content").value;
+    console.log(val);
+
+    let r = await make_post(val);
+    
+    let jso = await r.json();
+    if (r.status != 200) {
+        switch (jso.errornum) {
+            case 1:
+                // document.getElementById("new_post_error").textContent = `someone else has already used these words: ${jso.wordlist}`;
+                let list = JSON.stringify(jso.wordlist);
+                let uric = encodeURIComponent(list);
+                window.location = `/frontend/post/conflict?w=${uric}`;
+                return
+            default:
+                // document.getElementsByClassName("new_post_error").textContent = `error: ${jso.error} (${jso.errornum})`
+                document.writeln(`error ${jso.errornum}: ${jso.error}`);
+            }
+    }
+
+    window.location = "/"
+}
+</script>
+
+<body>
+    {% include "base/global.html" with context %}
+
+    <textarea id="post_content"></textarea>
+    <br/>
+    <button id="submit" onclick="do_make_post()">submit</button>
+</body>

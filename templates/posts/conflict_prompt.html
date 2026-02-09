@@ -1,0 +1,17 @@
+<!-- no requirements -->
+
+<title>post cnflic</title>
+<body>
+    {% include "base/global.html" with context %}
+
+    <h1>words aleay tkn</h1>
+    <p>
+       Your post was not created because it uses words you do not own:
+       <ul>
+            {% for word in words %}
+                <li>{{ word.word }} (owned by {{ word.owner }})</li>
+            {% endfor %}
+       </ul>
+       Please re<b>word</b> your post.
+    </p>
+</body>

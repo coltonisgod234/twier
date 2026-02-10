@@ -6,8 +6,14 @@
 <title>progres</title>
 <body>
     {% include "base/global.html" with context %}
+
     <progress id="our_progress" value="{{ progress.current_posts }}" max="{{ progress.max_posts }}"></progress>
-    <p>There are {{ progress.current_posts }} posts on the platform, which is about {{ progress.percent_scientific_approximate }} per cent of all theoretically possible posts</p>
+    <p>There are {{ progress.claims.num }} words claimed, which is about {{ progress.claims.percent }}% of all <a herf="/frontend/config/dictionary">possible claims</a></p>
+
+    <br/>
+    <a href="/frontend/config/unclaimables">view unclaimable words</a><br/>
+    <a href="/frontend/config/bans">view banned words</a><br/>
+    <a href="/frontend/config/dictionary">view dictionary (possible claims)</a> <b>(THIS ONE IS VERY BIG)</b>
 </body>
 
 <style>

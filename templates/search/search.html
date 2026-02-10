@@ -1,0 +1,50 @@
+<!-- no dependencies! -->
+{% include "base/global.html" with context %}
+
+<body>
+    <h1>Search twier</h1>
+
+    <form id="search_form" action="/searched" method="get">
+        <h2>Posts</h2>
+
+        <input type="text" name="POSTS_content_include_keywords" id="POSTS_content_include_keywords" />
+        <label for="POSTS_content_include_keywords">Include keywords in content</label>
+        <br/>
+
+        <input type="text" name="POSTS_content_exclude_keywords" id="POSTS_content_exclude_keywords" />
+        <label for="POSTS_content_exclude_keywords">Exclude keywords in content</label>
+        <br/>
+
+        <input type="text" name="POSTS_author_name_include_keywords" id="POSTS_author_name_include_keywords" />
+        <label for="POSTS_author_name_include_keywords">Include keywords in author username</label>
+        <br/>
+
+        <input type="text" name="POSTS_author_name_exclude_keywords" id="POSTS_author_name_exclude_keywords" />
+        <label for="POSTS_author_name_exclude_keywords">Exclude keywords in author username</label>
+        <br/>
+
+        <hr/>
+
+        <h2>Users</h2>
+
+        <input type="text" name="USERS_username_include_keywords" id="USERS_username_include_keywords" />
+        <label for="USERS_username_include_keywords">Include keywords in username</label>
+        <br/>
+
+        <input type="text" name="USERS_username_exclude_keywords" id="USERS_username_exclude_keywords" />
+        <label for="USERS_username_exclude_keywords">Exclude keywords in username</label>
+        <br/>
+
+        <input type="text" name="USERS_posts_content_include_keywords" id="USERS_posts_content_include_keywords" />
+        <label for="USERS_posts_content_include_keywords">Include keywords in any posts of this user</label>
+        <br/>
+
+        <input type="text" name="USERS_posts_content_exclude_keywords" id="USERS_posts_content_exclude_keywords" />
+        <label for="USERS_posts_content_exclude_keywords">Exclude keywords in any posts of this user</label>
+        <br/>
+
+        <hr/>
+
+        <input type="submit" value="Go!">
+    </form>
+</body>

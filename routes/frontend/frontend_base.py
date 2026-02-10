@@ -1,10 +1,13 @@
-from flask import request, render_template
+from flask import request, render_template, send_from_directory, Response, make_response
 from dataclasses import dataclass
 from db import tables
 import random
 from enum import Enum
 import sqlalchemy
 import os
+from boolcaps import true, false
+
+TOKEN_COOKIE_NAME = "twier_token"
 
 # non-hotreloadadable
 JS_PRELOAD = {}
@@ -79,6 +82,23 @@ def endpoint(requirements: list[str]):
     data = get_frontend_data(requirements)
     return data.into_kwargs()
 
+def token() -> str | None:
+    return request.cookies.get(TOKEN_COOKIE_NAME)
+
+def set_token(s: str, resp: Response):
+    resp.set_cookie(
+        TOKEN_COOKIE_NAME,
+        s,
+        samesite=true,
+        httponly=true,
+        secure=false,
+    )
+    
+def with_token(s: str, resp: str, status: int = 200):
+    resp = make_response(resp, status)
+    set_token(s, resp)
+    return resp
+
 def create_endpoints(app):
     @app.route("/")
     def twier():
@@ -106,7 +126,11 @@ def create_endpoints(app):
 
     @app.route("/frontend/signup")
     def frontend_signup():
-        return render_template("signup.html", **endpoint(["login.js", "cookie.js"]))
+        return with_token(
+            
+            render_template("signup.html", **endpoint(["login.js", "cookie.js"])),
+            200
+        )
 
     @app.route("/frontend/login")
     def frontend_login():
@@ -114,32 +138,69 @@ def create_endpoints(app):
     
     @app.route("/frontend/account")
     def frontend_account_page():
-        return render_template("account/settings.html", **endpoint(["cookie.js", "logout.js"]))
+        user = tables.User.transaction_by_bearer(request.authorization.token, lambda user, _: user.to_dict_api())
+
+        return render_template(
+            "account/settings.html",
+            user=user,
+            **endpoint(["cookie.js", "logout.js"])
+        )
+
+        # return render_template("account/settings.html", **endpoint(["cookie.js", "logout.js"]))
+    
+    @app.route("/frontend/user/<name>")
+    def frontend_user_by_name(name: str):
+        try: user = tables.User.transaction_by_name(name, lambda user, _: user.to_dict_api())
+        except Exception:
+            return "not found", 404
+
+        return render_template(
+            "account/user.html",
+            user=user,
+            **endpoint([])
+        )
 
     @app.route("/frontend/status")
     def frontend_stats():
-        from decimal import Decimal, getcontext
-        getcontext().prec = 100000  # set precision
-
-        MAX_POSTS = 27**160
-        current_posts = 0
-        with tables.Session() as session:
-            current_posts = session.query(tables.Post).count()
-            
-        percent = Decimal(current_posts) / Decimal(MAX_POSTS)
-
+        from routes.api.routes_progress import get_progress
         return render_template(
             "coolstuff/progress.html",
-            progress={
-                # "max_posts": 95**160,
-                # case insensitive version
-                "max_posts": MAX_POSTS,
-                "current_posts": current_posts,
-                "percent": percent,
-                "percent_scientific_approximate": f"{percent:.30E}"
-            },
+            progress=get_progress(),
             **endpoint([])
         )
+        
+    @app.route("/frontend/search")
+    def frontend_search():
+        return render_template(
+            "search/search.html",
+            **endpoint([])
+        )
+    
+    # TODO: enable bfcache on this page and this page only!
+    @app.route("/searched", methods=["GET"])
+    def frontend_searched():
+        from routes.api.routes_search import flask_args_to_search, search
+        search_data = flask_args_to_search()
+        search_results = search(search_data)
+        
+        return render_template(
+            "search/results.html",
+            search_results=search_results,
+            **endpoint([])
+        )
+
+    @app.route("/frontend/config/bans")
+    def frontend_get_bans():
+        return send_from_directory("config", "bans.txt")
+    
+    @app.route("/frontend/config/dictionary")
+    def frontend_get_dictionary():
+        return send_from_directory("config", "dictionary.txt")
+    
+    @app.route("/frontend/config/unclaimables")
+    def frontend_get_unclaimables():
+        return send_from_directory("config", "unclaimable.txt")
+    
 
 # def create_route(
 #     app,

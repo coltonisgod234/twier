@@ -1,0 +1,21 @@
+{% include "base/global.html" with context %}
+
+<body>
+    <title>{{ user.name }}</title>
+    <h1>{{ user.name }}</h1>
+
+    <h2>Words claimed</h2>
+
+    <ul>
+        {% for word in user.words %}
+            <li>{{ word.word }}</li>
+        {% endfor %}
+    </ul>
+
+    <h2>Posts made</h2>
+    <ul>
+        {% for post in user.posts %}
+            <li>"{{ post.content }}"</li>
+        {% endfor %}
+    </ul>
+</body>

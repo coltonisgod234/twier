@@ -14,6 +14,7 @@
     <a href="/frontend/signup">sign up</a>
     <a href="/frontend/login">log in</a>
     <a href="/frontend/status">proges</a>
+    <a href="/frontend/search">search</a>
     
     {% if session %}
         <a href="/frontend/account">{{ session.greeting }}, {{ session.name }}</a>
@@ -111,6 +112,12 @@ button:hover {
     font-style: italic;
 }
 
+#post_containers {
+    display: grid;
+    /* grid-template-columns: repeat(5, auto); */
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    row-gap: 0;
+}
 </style>
 
 <br/>

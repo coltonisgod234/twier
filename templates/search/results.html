@@ -1,0 +1,26 @@
+{% include "base/global.html" with context %}
+
+<body>
+    <h1>Results...</h1>
+
+    <div id="navbar">
+        <a href="#posts">posts</a>
+        <a href="#users">users</a>
+        <a href="#words">words</a>
+    </div>
+
+    <h2 id="posts">Posts</h2>
+
+    <grid id="post_containers">
+        {% for post in search_results.posts %}
+            {% include "base/post.html" with context %}
+        {% endfor %}
+    </grid>
+
+    <h2 id="users">Users</h2>
+    <ul>
+        {% for user in search_results.users %}
+            <li><a href="/frontend/user/{{user.name}}">{{ user.name }}</a></li>
+        {% endfor %}
+    </ul>
+</body>

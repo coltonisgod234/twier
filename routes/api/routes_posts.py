@@ -1,5 +1,5 @@
 from flask import request, make_response
-from db.tables import User, Session, Post, WordsAlreadyTakenException, BannedClaimUsedException
+from db.tables import User, Session, Post, WordsAlreadyTakenException, BannedWordsUsed
 from sqlalchemy.exc import IntegrityError
 
 def create_endpoints(app):
@@ -25,13 +25,14 @@ def create_endpoints(app):
                     "wordlist": w.words,
                     "errornum": 1
                 }, 409)
-                
-            except BannedClaimUsedException as w:
-                return make_response({
-                    "error": "banned claim used",
-                    "wordlist": w.words,
-                    "errornum": 2
-                }, 400)
+            
+            except BannedWordsUsed:
+                session.delete(user)
+                session.commit()
+                return {
+                    "error": "you said a no no word",
+                    "errornum": 3
+                }
 
         return {
             "error": None
@@ -39,7 +40,7 @@ def create_endpoints(app):
 
     @app.route("/api/v1/users/<name>/posts")
     def api_v1_user_get_posts(name: str):
-        return Post.get_posts_of_user(name)
+        return Post.get_posts_of_user_by_name(name)
 
     @app.route("/api/v1/posts/most_recent/<n>")
     def api_v1_get_recent_posts(n: int):

@@ -14,10 +14,9 @@ class WordsAlreadyTakenException(Exception):
         super().__init__(*args)
         self.words = words
         
-class BannedClaimUsedException(Exception):
-    def __init__(self, words, *args):
+class BannedWordsUsed(Exception):
+    def __init__(self, *args):
         super().__init__(*args)
-        self.words = words
 
 class Base(DeclarativeBase): pass
 
@@ -46,6 +45,37 @@ class User(Base):
                 return
             session.add(user)
             session.commit()
+
+    def to_dict_api(self) -> dict:
+        posts = []
+        for post in self.posts:
+            posts.append({
+                "content": post.content,
+                "id": post.id,
+            })
+            
+        words = []
+        for word in self.words:
+            words.append({
+                "owner": {
+                    "name": word.user.name,
+                    "id": word.user.id
+                },
+                "word": word.word
+            })
+
+        return {
+            "id": self.id,
+            "name": self.name,
+            "words": words,
+            "posts": posts,
+        }
+        
+    def to_dict_norecurse(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name
+        }
     
     @classmethod
     def login(self, name: str, passwd: bytes) -> str:
@@ -105,7 +135,10 @@ class User(Base):
         
         All words in `content` are added to the user's `words` field, and
         therefore the `words` table.
+        
+        Posts are always lowercase
         '''
+        content = content.lower()
         words = split_content_into_words(content)
         # ensure we can actually claim them
         from config import config
@@ -115,6 +148,10 @@ class User(Base):
             Word.word.in_(words),
             Word.user_id != self.id
         )
+        
+        if set(words).issubset(config.BANNED_WORDS):
+            # ban the guy
+            raise BannedWordsUsed()
  
         possibly_words = session.execute(stmt).all()
         
@@ -133,7 +170,10 @@ class User(Base):
             
             # ugly version of this that GPT wrote
             # stmt = insert(Word).values(word_objects)
-            stmt = insert(Word).values([{"user_id": self.id, "word": w} for w in words if w not in config.BANNED_CLAIMS])
+            stmt = insert(Word).values([{
+                "user_id": self.id,
+                "word": w
+            } for w in words if w not in config.BANNED_CLAIMS])
             stmt = stmt.prefix_with("OR IGNORE")  # SQLite will skip duplicates
             session.execute(stmt)
             
@@ -158,7 +198,7 @@ class Post(Base):
     content: Mapped[str] = mapped_column(String(160))
     
     @classmethod
-    def get_posts_of_user(self, name: str):
+    def get_posts_of_user_by_name(self, name: str):
         with Session() as session:
             # Get the user first
             query = session.query(User) \
@@ -166,7 +206,7 @@ class Post(Base):
                 
             user: User = session.execute(query).scalar_one()
             
-            return post_list_to_dictionaries(user.posts)
+            return list(post.to_dict_api() for post in user.posts)
 
     @classmethod
     def get_most_recent_posts(self, n: int):
@@ -177,7 +217,14 @@ class Post(Base):
                 
             posts: list[Post] = session.execute(query).scalars().all()
 
-            return post_list_to_dictionaries(posts)
+            return list(post.to_dict_api() for post in posts)
+        
+    def to_dict_api(self):
+        return {
+            "id": self.id,
+            "author": self.author.to_dict_norecurse(),
+            "content": self.content
+        }
 
 # thanks GPT!
 class Word(Base):
@@ -198,16 +245,11 @@ class Word(Base):
     
     def __repr__(self):
         return f"Word('{self.word}', by={self.user.__repr__()})"
+    
+    def to_dict_api(self):
+        return {
+            "word": self.word,
+            "owner": self.user.to_dict_norecurse(),
+        }
 
 Base.metadata.create_all(engine)
-
-def post_list_to_dictionaries(posts: list[Post]) -> list[dict]:
-    posts: list[Post] = posts
-    output_posts = []
-    for post in posts:
-        output_posts.append({
-            "author": post.author.name,
-            "content": post.content,
-        })
-
-    return output_posts

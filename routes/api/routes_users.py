@@ -62,3 +62,15 @@ def create_endpoints(app):
         return {
             "error": None
         }
+
+    @app.route("/api/v1/users/<name>")
+    def api1_users_info(name: str):
+        def payload(user: tables.User, _):
+            return user.to_dict_api()
+
+        try: return tables.User.transaction_by_name(name, payload)
+        except sqlalchemy.exc.NoResultFound:
+            return make_response({
+                "error": "user not found",
+                "errornum": 4
+            }, 404)

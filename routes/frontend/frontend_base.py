@@ -126,11 +126,7 @@ def create_endpoints(app):
 
     @app.route("/frontend/signup")
     def frontend_signup():
-        return with_token(
-            
-            render_template("signup.html", **endpoint(["login.js", "cookie.js"])),
-            200
-        )
+        return render_template("signup.html", **endpoint(["login.js", "cookie.js"]))
 
     @app.route("/frontend/login")
     def frontend_login():

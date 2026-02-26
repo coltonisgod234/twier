@@ -2,6 +2,24 @@
 
 <body>
     <h1>acount seing</h1>
-    {% include "account/user.html" with context %}
-    <button class="scarybutton" onclick="logout()">log out</button>
+
+    <div class="navbar">
+        <a class="scary" href="/frontend/do/logout">log out</a>
+        <a href="/frontend/user/{{ session.name }}">my profile</a>
+    </div>
+
+    <h2>delete account</h2>
+    <form action="/frontend/do/delete_account" method="post">
+        <input type="text" name="username" id="username" />
+        <label for="username">type username</label>
+
+        <br/>
+
+        <input type="password" name="password" id="password" />
+        <label for="password">type password</label>
+
+        <br/>
+
+        <input type="submit" value="delete account" class="scary">
+    </form>
 </body>

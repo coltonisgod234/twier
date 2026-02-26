@@ -4,7 +4,7 @@ from decimal import Decimal, getcontext
 
 # TODO: do a thing
 
-def create_routes(app):
+def create_endpoints(app):
     @app.route("/api/v1/progress")
     def api_get_progress():
         return get_progress()

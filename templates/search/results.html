@@ -3,24 +3,33 @@
 <body>
     <h1>Results...</h1>
 
-    <div id="navbar">
-        <a href="#posts">posts</a>
-        <a href="#users">users</a>
-        <a href="#words">words</a>
-    </div>
-
-    <h2 id="posts">Posts</h2>
-
-    <grid id="post_containers">
-        {% for post in search_results.posts %}
-            {% include "base/post.html" with context %}
-        {% endfor %}
-    </grid>
-
-    <h2 id="users">Users</h2>
-    <ul>
-        {% for user in search_results.users %}
-            <li><a href="/frontend/user/{{user.name}}">{{ user.name }}</a></li>
-        {% endfor %}
-    </ul>
+    {% if results.error is defined %}
+        <h1>Error</h1>
+        <var>message</var>: {{ results.error.msg }}
+        <br/>
+        <var>number</var>: {{ results.error.num }}
+        <br/>
+        <var>detail</var>: {{ results.error.offender }}
+    {% else %}
+        {% if type == "user" %}
+            <ul>
+                {% for user in results %}
+                    <li><a
+                        href="/frontend/user/{{user.name}}"
+                        target="_blank"
+                        rel="noopener noreferrer">{{ user.name }}</a></li>
+                {% endfor %}
+            </ul>
+        {% elif type == "post" %}
+            <grid id="post_containers">
+                {% for post in results.posts %}
+                    {% include "base/post.html" with context %}
+                {% endfor %}
+            </grid>
+        {% elif type == "word" %}
+            <em>unimplemented</em>
+        {% else %}
+            <em>you shouldn't be able to see this!</em>
+        {% endif %}
+    {% endif %}
 </body>

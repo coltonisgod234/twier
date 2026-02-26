@@ -34,13 +34,3 @@ async function do_signup() {
     }
 }
 </script>
-
-<body>
-    {% include "base/global.html" with context %}
-
-    <div>
-        <input type="text" id="username" placeholder="username" /><br/>
-        <input type="password" id="password" placeholder="password" /><br/>
-        <button onclick="do_signup()">sign up</button>
-    </div>
-</body>

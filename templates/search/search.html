@@ -1,50 +1,215 @@
-<!-- no dependencies! -->
 {% include "base/global.html" with context %}
+{# <a href="/frontend/search/docs">Search page documentation</a> #}
 
 <body>
-    <h1>Search twier</h1>
+    <h1>Search Editor</h1>
 
-    <form id="search_form" action="/searched" method="get">
-        <h2>Posts</h2>
+    <select id="query-type">
+        <option value="user" selected>user</option>
+        <option value="post">post</option>
+        <option value="word">word</option>
+    </select>
 
-        <input type="text" name="POSTS_content_include_keywords" id="POSTS_content_include_keywords" />
-        <label for="POSTS_content_include_keywords">Include keywords in content</label>
-        <br/>
+    <button onclick="do_search()">preform search</button>
 
-        <input type="text" name="POSTS_content_exclude_keywords" id="POSTS_content_exclude_keywords" />
-        <label for="POSTS_content_exclude_keywords">Exclude keywords in content</label>
-        <br/>
-
-        <input type="text" name="POSTS_author_name_include_keywords" id="POSTS_author_name_include_keywords" />
-        <label for="POSTS_author_name_include_keywords">Include keywords in author username</label>
-        <br/>
-
-        <input type="text" name="POSTS_author_name_exclude_keywords" id="POSTS_author_name_exclude_keywords" />
-        <label for="POSTS_author_name_exclude_keywords">Exclude keywords in author username</label>
-        <br/>
-
-        <hr/>
-
-        <h2>Users</h2>
-
-        <input type="text" name="USERS_username_include_keywords" id="USERS_username_include_keywords" />
-        <label for="USERS_username_include_keywords">Include keywords in username</label>
-        <br/>
-
-        <input type="text" name="USERS_username_exclude_keywords" id="USERS_username_exclude_keywords" />
-        <label for="USERS_username_exclude_keywords">Exclude keywords in username</label>
-        <br/>
-
-        <input type="text" name="USERS_posts_content_include_keywords" id="USERS_posts_content_include_keywords" />
-        <label for="USERS_posts_content_include_keywords">Include keywords in any posts of this user</label>
-        <br/>
-
-        <input type="text" name="USERS_posts_content_exclude_keywords" id="USERS_posts_content_exclude_keywords" />
-        <label for="USERS_posts_content_exclude_keywords">Exclude keywords in any posts of this user</label>
-        <br/>
-
-        <hr/>
-
-        <input type="submit" value="Go!">
-    </form>
+    <div id="graph"></div>
 </body>
+
+<script>
+const DEFAULT_CLAUSE = {
+    type: "all",
+    field: "",
+    params: []
+}
+
+const DEFAULT_VALUE = {
+    type: "null",
+    value: null
+}
+
+const FIELDS_USER = ["id", "name", "words", "posts"]
+const FIELDS_POST = ["id", "author_id"]
+const FIELDS_WORD = ["id", "owner_id"]
+const FIELDS_COMMON = ["null"]
+
+let query = {
+    type: "user",
+    value: {
+        type: "clause",
+        value: structuredClone(DEFAULT_CLAUSE)
+    }
+}
+
+const CLAUSE_TYPES = ["all", "like", "not", "gt", "ge", "lt", "le", "eq"]
+
+// JSON has `type` (typename str) and `value` (anything)
+function value(json, into) {
+    let type_picker = create_type_picker(json, "type", ["string", "int", "float", "clause", "null"])
+    create_container(type_picker, "type", into);
+
+    switch (json.type) {
+        case "clause":
+            // failsafe for when a clause is added
+            let failsafe = (json.value === null);
+            if (failsafe) {
+                json.value = structuredClone(DEFAULT_CLAUSE)
+                console.log("failsafe used");
+            }
+
+            clause(json.value, into);
+            break;
+
+        case "string":
+            value_string(json, into);
+            break;
+
+        case "int":
+            value_number(json, 1, "int", into);
+            break;
+
+        case "float":
+            value_number(json, 0.1, "float", into);
+            break;
+    }
+}
+
+function value_string(json, into) {
+    let selector = document.createElement("input");
+    selector.type = "text";
+    selector.value = json.value;
+    selector.addEventListener("input", (ev) => {
+        json.type = "string";
+        json.value = ev.target.value;
+    });
+
+    create_container(selector, "value", into);
+}
+
+// JSON has `type` (String) and `value` (any type)
+function value_number(json, step, typename_str, into) {
+    // selector
+    let selector = document.createElement("input");
+    selector.type = "number";
+    selector.step = step;
+    selector.addEventListener("input", (ev) => {
+        json.type = typename_str;
+        json.value = ev.target.value;
+    })
+
+    create_container(selector, "value", into);
+}
+
+function create_type_picker(json, field, types) {
+    let type_selector = document.createElement("select");
+    types.forEach((ty) => {
+        let option = document.createElement("option");
+        option.selected = json[field] === ty;
+        option.value = ty;
+        option.textContent = ty;
+
+        type_selector.appendChild(option);
+    });
+    
+    type_selector.addEventListener("input", (ev) => {
+        json[field] = ev.target.value;
+        redraw_entire_graph()
+    });
+
+    return type_selector
+}
+
+function create_container(selector, label_str, into) {
+    // label
+    let label = document.createElement("var");
+    label.textContent = `${label_str}: `;
+
+    let container = document.createElement("div");
+    container.appendChild(label);
+    container.appendChild(selector);
+
+    into.appendChild(container);
+}
+
+function get_field_types() {
+    switch (query.type) {
+        case "user": return FIELDS_COMMON.concat(FIELDS_USER)
+        case "post": return FIELDS_COMMON.concat(FIELDS_POST)
+        case "word": return FIELDS_COMMON.concat(FIELDS_WORD)
+    }
+}
+
+// JSON has `field` (str), `params` (list) and `type` (typename str)
+function clause(json, into) {
+    // create the type picker
+    let type_picker = create_type_picker(json, "type", CLAUSE_TYPES);
+    create_container(type_picker, "clause-type", into);
+
+    // create the field picker
+    // eventually switch this to a picker UI
+    let field_name = create_type_picker(json, "field", get_field_types())
+    create_container(field_name, "field", into);
+
+    // create outer data
+    let params_list = document.createElement("ul");
+    json.params.forEach((par, index) => {
+        let inner = document.createElement("li");
+
+        // remove button
+        let remove = document.createElement("button");
+        remove.textContent = "remove";
+        remove.addEventListener("click", (_) => {
+            json.params.splice(index, 1);
+            redraw_entire_graph();
+        });
+
+        inner.appendChild(remove);
+        value(par, inner);
+
+        params_list.appendChild(inner);
+    });
+    
+    // add button
+    let add_button = document.createElement("button");
+    add_button.textContent = "add";
+    add_button.addEventListener("click", (_) => {
+        let copy = structuredClone(DEFAULT_VALUE);
+        json.params.push(copy);
+        redraw_entire_graph();
+    })
+
+    // outer container
+    let params_div = document.createElement("div");
+    params_div.appendChild(add_button);
+    params_div.appendChild(params_list);
+
+    create_container(params_div, "params", into);
+}
+
+async function do_search() {
+    const response = await fetch("/frontend/searched", {
+        method: "POST",
+        body: JSON.stringify(query),
+        headers: {
+            "Content-Type": "application/json"
+        }
+    });
+
+    let txt = await response.text();
+    document.write(txt);
+}
+
+let searchfor = document.getElementById("query-type");
+searchfor.addEventListener("input", (ev) => {
+    query.type = ev.target.value;
+    redraw_entire_graph()
+})
+
+let graph = document.getElementById("graph");
+
+function redraw_entire_graph() {
+    graph.replaceChildren();  // clear graph
+    clause(query.value.value, graph);
+}
+
+redraw_entire_graph();
+</script>

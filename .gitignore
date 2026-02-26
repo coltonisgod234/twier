@@ -2,3 +2,6 @@ db.sqlite
 config/bans.txt
 config/dictionary.txt
 config/unclaimable.txt
+__pycache__/
+.venv/
+scrap/

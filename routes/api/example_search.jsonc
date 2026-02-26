@@ -1,0 +1,26 @@
+// example_search.jsonc
+{
+    "type": "user",
+    "value": {
+        "type": "clause",
+        "value": {
+            "field": null,
+            "type": "any",
+            "params": [
+                {
+                    "type": "clause",
+                    "value": {
+                        "field": "name",
+                        "type": "like",
+                        "params": [
+                            {
+                                "type": "string",
+                                "value": "%colton%"
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    }
+}

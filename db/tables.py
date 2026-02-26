@@ -9,7 +9,11 @@ from typing import Callable
 engine = create_engine("sqlite:///db.sqlite", echo=true)
 Session = sessionmaker(bind=engine)
 
-class WordsAlreadyTakenException(Exception):
+class APISafeProto:
+    def to_dict_api(self) -> dict:
+        raise NotImplementedError("to_dict_api() not implemented")
+
+class WordsAlreadyTaken(Exception):
     def __init__(self, words, *args):
         super().__init__(*args)
         self.words = words
@@ -18,22 +22,30 @@ class BannedWordsUsed(Exception):
     def __init__(self, *args):
         super().__init__(*args)
 
+class IlligalContent(Exception): pass
+
 class Base(DeclarativeBase): pass
 
-class User(Base):
+class User(Base, APISafeProto):
     __tablename__ = "users"
-    
+
     id: Mapped[int] = mapped_column(Integer, primary_key=true)
     name: Mapped[str] = mapped_column(String, unique=true)
     password: Mapped[bytes] = mapped_column(LargeBinary(60), unique=false)
     session: Mapped[bytes] = mapped_column(String(96), unique=true, nullable=true)
-    
+
     words: Mapped[list["Word"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan"  # don't know why I need this
     )
-    
-    posts: Mapped[list["Post"]] = relationship(back_populates="author")
+
+    posts: Mapped[list["Post"]] = relationship(
+        back_populates="author",
+        cascade="all, delete-orphan"  # I think I get why I need this a lil more now...
+    )
+
+    def logout(self):
+        self.session = None
 
     @classmethod
     def add_user(self, name: str, passwd: str):
@@ -53,14 +65,15 @@ class User(Base):
                 "content": post.content,
                 "id": post.id,
             })
-            
+
         words = []
         for word in self.words:
             words.append({
-                "owner": {
-                    "name": word.user.name,
-                    "id": word.user.id
-                },
+                # Removed because it's redundant
+                # "owner": {
+                #     "name": word.user.name,
+                #     "id": word.user.id
+                # },
                 "word": word.word
             })
 
@@ -70,42 +83,41 @@ class User(Base):
             "words": words,
             "posts": posts,
         }
-        
+
     def to_dict_norecurse(self) -> dict:
         return {
             "id": self.id,
             "name": self.name
         }
+
+    def check_login_raw(self, passwd: bytes) -> bool:
+        return checkpw(passwd, self.password)
     
-    @classmethod
-    def login(self, name: str, passwd: bytes) -> str:
+    def check_login_str(self, passwd: str) -> bool:
+        return checkpw(bytes(passwd, encoding="utf-8"), self.password)
+        
+    def login_str(self, passwd: str) -> str:
         """
         Output is guaranteed to be printable, that is, serializable into JSON.
         """
         possibly_use_this_token = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(96))
-        def payload(user, session):
-            if checkpw(passwd, user.password):
-                user.session = possibly_use_this_token
-            
-            else:
-                raise PermissionError
+        if self.check_login_str(passwd):
+            self.session = possibly_use_this_token
+            return possibly_use_this_token
 
-            session.commit()
-            
-        self.transaction_by_name(name, payload)
+        else:
+            raise PermissionError
 
-        return possibly_use_this_token
-    
     @classmethod
     def transaction_by_name(self, name: str, closure: Callable[[User, sessionmaker], None]):
         with Session() as session:
             stmt = select(User) \
                 .where(User.name == name)
-                
+
             user = session.execute(stmt).scalar_one()
-            
+
             return closure(user, session)
-            
+
     @classmethod
     def transaction_by_bearer(self, token: str, closure: Callable[[User, sessionmaker], None]):
         with Session() as session:
@@ -115,17 +127,17 @@ class User(Base):
             user = session.execute(stmt).scalar_one()
 
             return closure(user, session)
-        
+
     @classmethod
     def check_login_by_bearer(self, token: str) -> bool:
         # doesn't check for collisions, we live dangerously
         with Session() as session:
             stmt = select(User).where(User.token == token)
-            
+
             user = session.execute(stmt).scalar_one_or_none()
             if user == None:
                 return false
-            
+
             else:
                 return true
 
@@ -138,8 +150,12 @@ class User(Base):
         
         Posts are always lowercase
         '''
+        if len(content.strip()) == 0:
+            raise IlligalContent
+
         content = content.lower()
         words = split_content_into_words(content)
+
         # ensure we can actually claim them
         from config import config
 
@@ -148,13 +164,13 @@ class User(Base):
             Word.word.in_(words),
             Word.user_id != self.id
         )
-        
+
         if set(words).issubset(config.BANNED_WORDS):
             # ban the guy
             raise BannedWordsUsed()
- 
+
         possibly_words = session.execute(stmt).all()
-        
+
         if possibly_words:
             # AtributeError: w.user
             print(possibly_words.__repr__())
@@ -162,12 +178,12 @@ class User(Base):
                 "word": w[0].word,
                 "owner": w[0].user.name
             } for w in possibly_words)
-            raise WordsAlreadyTakenException(word_strings)
+            raise WordsAlreadyTaken(word_strings)
 
         # where we make the thing
         else:
             # word_objects = list(Word(user=self, word=s) for s in words)
-            
+
             # ugly version of this that GPT wrote
             # stmt = insert(Word).values(word_objects)
             stmt = insert(Word).values([{
@@ -176,7 +192,7 @@ class User(Base):
             } for w in words if w not in config.BANNED_CLAIMS])
             stmt = stmt.prefix_with("OR IGNORE")  # SQLite will skip duplicates
             session.execute(stmt)
-            
+
             # inserts will NOT show up until the next query! Which is fine
 
             # create the post
@@ -187,7 +203,7 @@ def split_content_into_words(s: str) -> list[str]:
     import re
     return re.findall("[A-z0-9]+", s)
 
-class Post(Base):
+class Post(Base, APISafeProto):
     __tablename__ = "posts"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=true)
@@ -196,16 +212,16 @@ class Post(Base):
     author: Mapped[User] = relationship(back_populates="posts")
 
     content: Mapped[str] = mapped_column(String(160))
-    
+
     @classmethod
     def get_posts_of_user_by_name(self, name: str):
         with Session() as session:
             # Get the user first
             query = session.query(User) \
                 .where(User.name == name)
-                
+
             user: User = session.execute(query).scalar_one()
-            
+
             return list(post.to_dict_api() for post in user.posts)
 
     @classmethod
@@ -214,7 +230,7 @@ class Post(Base):
             query = session.query(Post) \
                 .order_by(desc(Post.id)) \
                 .limit(n)
-                
+
             posts: list[Post] = session.execute(query).scalars().all()
 
             return list(post.to_dict_api() for post in posts)
@@ -227,7 +243,7 @@ class Post(Base):
         }
 
 # thanks GPT!
-class Word(Base):
+class Word(Base, APISafeProto):
     __tablename__ = "words"
 
     user_id: Mapped[int] = mapped_column(
@@ -242,10 +258,10 @@ class Word(Base):
     )
 
     user: Mapped[User] = relationship(back_populates="words")
-    
+
     def __repr__(self):
         return f"Word('{self.word}', by={self.user.__repr__()})"
-    
+
     def to_dict_api(self):
         return {
             "word": self.word,

@@ -1,114 +1,34 @@
-from db.tables import Session, Post, User
-from dataclasses import dataclass
 from sqlalchemy import select
-
-@dataclass
-class PostsSearchData:
-    content_include_keywords: list[str]
-    content_exclude_keywords: list[str]
-
-    author_name_include_keywords: list[str]
-    author_name_exclude_keywords: list[str]
-    
-    __form__ = {
-        "POSTS_content_include_keywords": "content_include_keywords",
-        "POSTS_content_exclude_keywords": "content_exclude_keywords",
-        "POSTS_author_name_include_keywords": "author_name_include_keywords",
-        "POSTS_author_name_exclude_keywords": "author_name_exclude_keywords"
-    }
-
-@dataclass
-class UsersSearchData:
-    username_include_keywords: list[str]
-    username_exclude_keywords: list[str]
-    
-    posts_content_include_keywords: list[str]
-    posts_content_exclude_keywords: list[str]
-    
-    __form__ = {
-        "USERS_username_include_keywords": "username_include_keywords",
-        "USERS_username_exclude_keywords": "username_exclude_keywords",
-        "USERS_posts_content_include_keywords": "posts_content_include_keywords",
-        "USERS_posts_content_exclude_keywords": "posts_content_exclude_keywords"
-    }
+from dataclasses import dataclass
+from db.tables import Session
+from routes.api.search.clauses import *
 
 @dataclass
 class SearchData:
-    posts: PostsSearchData | None
-    users: UsersSearchData | None
-    words: None
-    
-    limit: int
-
-###################
-# BEGIN DUMB SHIT #
-###################
-
-def search_posts_stmt(data: dict):
-    stmt = select(Post)
-    
-    if keywords := data["content_include_keywords"]:
-        for keyword in keywords:
-            stmt = stmt.where(Post.content.like(keyword))
-            
-    if keywords := data["content_exclude_keywords"]:
-        for keyword in keywords:
-            stmt = stmt.where(Post.content.not_like(keyword))
-
-    like_keywords = data["author_name_include_keywords"] or []
-    unlike_keywords = data["author_name_exclude_keywords"] or []
-    if like_keywords or unlike_keywords:
-        stmt = stmt.join(Post.author)
-
-        for keyword in like_keywords:
-            stmt = stmt.where(User.name.like(keyword))
-            
-        for keyword in unlike_keywords:
-            stmt = stmt.where(User.name.not_like(keyword))
-    
-    return stmt
-
-def search_users_stmt(data: dict):
-    stmt = select(User)
-    
-    if keywords := data["username_include_keywords"]:
-        for keyword in keywords:
-            stmt = stmt.where(User.name.like(keyword))
-            
-    if keywords := data["username_exclude_keywords"]:
-        for keyword in keywords:
-            stmt = stmt.where(User.name.not_like(keyword))
-
-    return stmt
-
-######################
-# END STUPID SHIT    #
-######################
+    root: SearchClauseBase
+    ty: Type
 
 def search(data: SearchData):
+    # prepare query
+    query = select(data.ty)
+
+    if True:
+        fname = data.root._fieldname_
+        if fname == None:
+            query = data.root.query(None, query)
+
+        else:
+            field = getattr(data.ty, fname)
+            query = data.root.query(field, query)
+        
+    # make the search
     with Session() as session:
-        # build the query
-        users = []
-        posts = []
-        words = []
+        sql_res = session.execute(query).scalars().all()
+        results = []
+        for item in sql_res:
+            results.append(item.to_dict_api())
 
-        # posts
-        if data.posts:
-            stmt = search_posts_stmt(data.posts).limit(data.limit)
-            results = session.execute(stmt).all()
-            posts = list(res[0].to_dict_api() for res in results)
-
-        # users
-        if data.users:
-            stmt = search_users_stmt(data.users).limit(data.limit)
-            results = session.execute(stmt).all()  # no idea why I need to call it like this
-            users = list(res[0].to_dict_api() for res in results)
-
-        return {
-            "posts": posts,
-            "users": users,
-            "words": words
-        }
+        return results
 
 def create_endpoints(app):
     @app.route("/api/v1/search", methods=["POST"])
@@ -117,32 +37,157 @@ def create_endpoints(app):
         searches via JSON
         '''
         from flask import request
-        
-        return search(request.json)
-    
-    def api1_search_form():
-        '''
-        searches via form data
-        '''
-        data = flask_args_to_search()
+        return search_api_json(json_to_search(json))
+
+def search_api_json(data) -> dict:
+    try:
         return search(data)
-
-def flask_args_to_search() -> SearchData:
-    from flask import request
-
-    posts = {}
-    for (k, v) in PostsSearchData.__form__.items():
-        posts[v] = request.args.get(k)
     
-    users = {}
-    for (k, v) in UsersSearchData.__form__.items():
-        users[v] = request.args.get(k)
-    
-    data = SearchData(
-        posts,
-        users,
-        None,
-        request.args.get("limit", default=10)
+    except InvalidQueryFor as e:
+        return {
+            "error": {
+                "msg": "invalid query type",
+                "num": 8,
+                "offender": e.problem
+            }
+        }, 400
+        
+    except InvalidClauseType as e:
+        return {
+            "error": {
+                "msg": "invalid clause type",
+                "num": 11,
+                "offender": e.problem
+            }
+        }, 400
+        
+    except AttributeError as e:
+        return {
+            "error": {
+                "msg": "not even Colton knows what this error is",
+                "num": -2,
+                "offender": f"Some Python error: {e.__repr__()}"
+            }
+        }
+
+class InvalidQueryFor(Exception):
+    def __init__(self, problem: str, *args):
+        self.problem = problem
+        super().__init__(*args)
+
+class InvalidClauseType(Exception):
+    def __init__(self, problem: str, *args):
+        self.problem = problem
+        super().__init__(*args)
+
+
+def json_to_search(json: dict) -> SearchData:
+    '''
+    # JSON format
+    {
+        "type": [content type],
+        "value": [JSON value representing clause]
+    }
+    '''
+    return SearchData(
+        root    = value_from_dict(json["value"]),
+        ty      = query_type_from_str(json["type"])
     )
+
+def clause_from_params(ty, args, field) -> SearchClauseBase:
+    # block certain fields
+    if isinstance(field, str):
+        if field in ["password", "session"]:
+            raise ValueError("Illegal field name!")
+
+    x = ty(*args)
+    x._fieldname_ = field
+    return x
+
+def clause_from_json(json: dict) -> SearchClauseBase:
+    '''
+    # JSON format
+    ```
+    {
+        "type": [clause id],
+        "params": [
+            {
+                "type": [typeid],
+                "value": [corresponding JSON data type]
+            }
+        ],
+        "field": [field name]
+    }
+    ```
     
-    return data
+    ## Clause names
+    * `like(str)`: SQL `like` operation
+    * `eq(any)`: equals operation
+    * `gt(int | float)`: greater-than operation
+    * `lt(int | float)`: less-than operation
+    * `not(clause)`: applies `not` to it's subclause
+    * `all(list[clause])`
+    
+    ## Type IDs
+    * `string`: data is a free-form string.
+    * `int`: data is a 64-bit integer.
+    * `float`: data is a 64-bit float.
+    * `null`: there is no data, the `value` key can be omitted
+    * `clause`: data is a JSON object representing another, sub-clause.
+    * `list`: JSON list, in the same format as `params`
+    '''
+    ty = clause_type_from_str(json["type"])
+    args = search_args_from_params(json["params"])
+    field = json["field"]
+    
+    return clause_from_params(ty, args, field)
+
+def search_args_from_params(json: list[dict]):
+    args_out = []
+    for par in json:
+        args_out.append(value_from_dict(par))
+        
+    return args_out        
+
+def value_from_dict(json: dict):
+    arg_t = json["type"]
+    arg_v = None
+
+    match arg_t:  # special coersions happen in this match
+        case "string" | "int" | "float": arg_v = json["value"]
+        case "clause": arg_v = clause_from_json(json["value"])
+        case "list": arg_v = search_args_from_params(json["value"])
+        case _: raise TypeError
+        
+    return arg_v
+
+def clause_type_from_str(s: str) -> Type:
+    match s:
+        case "like": return SearchClauseLike
+        case "all": return SearchClauseAll
+        case "limit": return SearchClauseLimit
+        case "not": return SearchClauseNot
+        case "gt": return SearchClauseGt
+        case "ge": return SearchClauseGe
+        case "lt": return SearchClauseLt
+        case "le": return SearchClauseLe
+        case "eq": return SearchClauseEq
+        case other: raise InvalidClauseType(other)
+    
+def query_type_from_str(s: str) -> Type:
+    from db.tables import User, Post, Word
+    
+    query_for = None
+    match s:
+        case "user": query_for = User
+        case "post": query_for = Post
+        case "word": query_for = Word
+        case other: raise InvalidQueryFor(other)
+        
+    return query_for
+
+def flask_args_to_search():
+    from flask import request
+    
+    query_for = query_type_from_str(request.form["for"])
+    

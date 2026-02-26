@@ -1,19 +1,22 @@
-<!-- <script src="/static/js/loader.js" defer></script>
-<script src="/static/js/logout.js" defer></script> -->
+{#<script src="/static/js/loader.js" defer></script>
+<script src="/static/js/logout.js" defer></script>#}
 
-<!-- DONT DELETE THIS ITS IMPORTANT -->
-{% for module in __modules__ %}
-<script defer>
-    {{ module | safe }}
-</script>
-{% endfor %}
+{# now unused #}
+{#
+    {% if __modules__ %}
+        {% for module in __modules__ %}
+        <script defer>
+            {{ module | safe }}
+        </script>
+        {% endfor %}
+    {% endif %}
+#}
 
-<!--- OK YOU CAN MESS WITH THIS PART -->
-<nav id="navbar">
+<nav class="navbar">
     <a href="/">twier</a>
     <a href="/frontend/signup">sign up</a>
     <a href="/frontend/login">log in</a>
-    <a href="/frontend/status">proges</a>
+    <a href="/frontend/status">progess</a>
     <a href="/frontend/search">search</a>
     
     {% if session %}
@@ -22,102 +25,10 @@
     {% endif %} 
 </nav>
 
-<style>
-/* @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Libre+Barcode+39+Extended&display=swap');; */
-
-#navbar {
-    display: flex;
-    gap: 2rem;  /* space between items */
-}
-
-* {
-    background-color: black;
-    color: white;
-    font-family: "JetBrains Mono";
-}
-
-a {
-    font-weight: 300;
-    font-style: italic;
-    text-decoration: none;
-    color: violet;
-}
-
-a:hover {
-    font-weight: 900;
-    text-decoration: none;
-    color: purple;
-    transition-duration: 200ms;
-}
-
-button {
-    color: black;
-    background: violet;
-    border-radius: 15px 15px;
-    border: 5px solid violet;
-}
-
-:root {
-    --shakemag: 3px;
-}
-
-@keyframes shake {
-    0% { transform: translate(
-        var(--shakemag),
-        calc(var(--shakemag) * -0.5));
-    };
-    25% { transform: translate(
-        calc(var(--shakemag) * -1),
-        calc(var(--shakemag) * -0.5));
-    };
-    50% { transform: translate(
-        calc(var(--shakemag) * -1),
-        calc(var(--shakemag) * 0.5));
-    };
-    75% { transform: translate(
-        var(--shakemag),
-        calc(var(--shakemag) * 0.5));
-    };
-    100% { transform: translate(
-        var(--shakemag),
-        calc(var(--shakemag) * -0.5));
-    }
-}
-
-button:hover {
-    color: white;
-    background-color: purple;
-}
-
-.scarybutton:hover {
-    animation: shake 0.1s ease-in-out infinite;
-    color:red;
-    background-color: darkred;
-    border: 5px solid maroon;
-
-}
-
-/* .gun:hover::after {
-    content: url("https://image.pngaaa.com/583/132583-middle.png");
-} */
-
-.post {
-    outline: 1px solid white;
-    /* width: auto; */
-}
-.author::after {
-    content: " " attr(time);
-    font-size: 75%;
-    font-style: italic;
-}
-
-#post_containers {
-    display: grid;
-    /* grid-template-columns: repeat(5, auto); */
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    row-gap: 0;
-}
-</style>
+{% if session.theme is not defined %}
+    <style>{% include "base/css/themes/original.css" %}</style>
+{% else %}
+    <style>{% include "base/css/themes/{{ session.theme }}.css" %}</style>
+{% endif %}
 
 <br/>

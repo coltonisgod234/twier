@@ -1,0 +1,9 @@
+{% include "base/global.html" with context %}
+
+<body>
+    <h1>failed to log in</h1>
+    <p>You were not logged in due to the following error: <code>{{ error.message }}</code></p>
+<pre>
+{{ error.tb }}
+</pre>
+</body>

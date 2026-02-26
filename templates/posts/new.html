@@ -3,8 +3,6 @@
 <script>
 async function do_make_post() {
     let val = document.getElementById("post_content").value;
-    console.log(val);
-
     let r = await make_post(val);
     
     let jso = await r.json();
@@ -29,7 +27,8 @@ async function do_make_post() {
 <body>
     {% include "base/global.html" with context %}
 
-    <textarea id="post_content"></textarea>
-    <br/>
-    <button id="submit" onclick="do_make_post()">submit</button>
+    <form action="/frontend/post/new/form" method="post">
+        <input type="text" name="content" id="content" />
+        <input type="submit" value="post!" />
+    </form>
 </body>

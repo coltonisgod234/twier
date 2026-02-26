@@ -1,0 +1,162 @@
+from flask import render_template, session, request
+from copy import deepcopy
+
+DEFAULT_QUERY = {
+    "type": "(uninitialized query)",
+    "value": {
+        "field": None,
+        "type": "any",
+        "params": []
+    }
+}
+
+DEFAULT_CLAUSE = {
+    "field": None,
+    "type": "(unset)",
+    "params": []
+}
+
+def get_query_data():
+    query = session.get("query_base")
+    if query == None:
+        session["query_base"] = deepcopy(DEFAULT_QUERY)
+        return session.get("query_base")  # probably can't fail!
+    
+    return query
+
+def __search_endpoint():
+    query = get_query_data()
+    
+    return render_template(
+        "search/search.html",
+        query = query
+    )
+    
+# # GPT wrote this
+# def get_container_ref(d, path):
+#     """
+#     Get a reference to a nested dict/list using dot-paths.
+#     Special rules:
+#       - empty string or "." → d["value"]["params"]
+#       - single-number path like ".8" → d["value"]["params"][8]
+#       - multi-segment paths like ".0.1" → follow normally
+#     """
+#     if not path or path == ".":
+#         return d["value"], "params"
+
+#     if path.startswith("."):
+#         path = path[1:]
+
+#     keys = path.split(".")
+#     current = d
+
+#     # special case: single numeric key at top level
+#     if len(keys) == 1 and keys[0].isdigit():
+#         return current["value"]["params"], int(keys[0])
+
+#     # normal traversal
+#     for k in keys[:-1]:
+#         if isinstance(current, list):
+#             k = int(k)
+#         current = current[k]
+
+#     last_key = keys[-1]
+#     if isinstance(current, list):
+#         last_key = int(last_key)
+
+#     return current, last_key
+
+def get_container_ref(d, path):
+    """
+    Given a query dict 'd' and a dot-separated path, 
+    return (parent_container, key) such that parent_container[key] 
+    accesses the target item.
+    """
+    if not path:  # empty string
+        print("get_container_ref: empty path: d['value']['params']")
+        return d["value"], "params"
+
+    keys = path.split(".")
+    current = d["value"]["params"]  # start at top-level params
+    print(f"get_container_ref: keys: {keys}")
+
+    for k in keys[:-1]:  # traverse all but the last key
+        k = int(k)
+        current = current[k]["value"]["params"]  # go one level deeper
+        print(f"get_container_ref: entering key {k}")
+
+    last_key = int(keys[-1]) if len(keys) > 0 else None
+    print(f"get_container_ref: last key: {last_key}")
+    return current, last_key
+
+def parse_query_path(path: str, query: dict):
+    path = path.strip("value.")
+    parent, key = get_container_ref(query, path)
+        
+    return parent, key
+
+def create_endpoints(app):
+    @app.route("/frontend/search/builder/do/clause_remove_form/<path>", methods=["POST"])
+    def frontend_search_clause_remove(path: str):
+        parent, key = parse_query_path(path, get_query_data())
+        print(parent, key)
+
+        parent.pop(key)
+
+        session.modified = True
+
+        return __search_endpoint()
+
+    @app.route("/frontend/search/builder/do/clause_add_form/<path>", methods=["POST"])
+    def frontend_search_clause_add(path: str):
+        parent, key = parse_query_path(path, get_query_data())
+        print(parent, key)
+
+        assert isinstance(parent, dict), "only dicts"
+
+        if not parent.get(key):
+            parent[key] = []
+
+        parent[key].append({
+            "type": "(unset)",
+            "params": []
+        })
+
+        session.modified = True
+
+        return __search_endpoint()
+    
+    @app.route("/frontend/search/builder/do/param_modify_form/<path>", methods=["POST"])
+    def frontend_search_param_modify(path: str):
+        parent, key = parse_query_path(path, get_query_data())
+        print(parent, key, get_query_data())
+        
+        new_dict = deepcopy(parent[key])
+        new_dict["type"] = request.form["type"]
+        
+        match request.form["type"]:
+            case "int" | "float" | "string": new_dict["value"] = request.form.get("value", default="")
+            case "clause": new_dict["value"] = deepcopy(DEFAULT_CLAUSE)
+            case _: return __search_endpoint()
+        
+        parent[key] = new_dict
+
+        session.modified = True
+
+        return __search_endpoint()
+
+    @app.route("/frontend/search")
+    def frontend_search():
+        return __search_endpoint()
+    
+    # TODO: enable bfcache on this page and this page only!
+    @app.route("/searched", methods=["GET"])
+    def frontend_searched():
+        from routes.api.routes_search import flask_args_to_search, search
+        search_data = flask_args_to_search()
+        search_results = search(search_data)
+        
+        return render_template(
+            "search/results.html",
+            search_results=search_results,
+        )

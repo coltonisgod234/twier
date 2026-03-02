@@ -37,7 +37,7 @@ def create_endpoints(app):
         searches via JSON
         '''
         from flask import request
-        return search_api_json(json_to_search(json))
+        return search_api_json(json_to_search(request.json))
 
 def search_api_json(data) -> dict:
     try:

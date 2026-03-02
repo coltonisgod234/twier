@@ -1,10 +1,21 @@
 from flask import request, make_response
 from db.tables import User, Session, Post, WordsAlreadyTaken, BannedWordsUsed, IlligalContent
-from sqlalchemy.exc import IntegrityError
+from routes.base import SchEndpoint, SchPost, wrap_error_endpoint, Content, SchListOf
 
-def create_endpoints(app):
-    @app.route("/api/v1/post/create", methods=["POST"])
-    def api_v1_post_create():        
+class v1_PostCreate(SchEndpoint):
+    method = "POST"
+    path = "/api/v1/post/create"
+    
+    auth = "token"
+    codes = [200, 409, 500]
+    
+    req = Content({
+        "content": [str]
+    })
+
+    res = wrap_error_endpoint([3, 7], {})
+    
+    def view():        
         auth = request.authorization.token
         content = request.json["content"]
 
@@ -33,13 +44,47 @@ def create_endpoints(app):
                 "error": None
             }
 
-    @app.route("/api/v1/users/<name>/posts")
-    def api_v1_user_get_posts(name: str):
-        return Post.get_posts_of_user_by_name(name)
+class v1_UserGetPosts(SchEndpoint):
+    method = "GET"
+    path = "/api/v1/users/<name>/posts"
+    
+    codes = [200, 404]
+    
+    res = Content({
+        "posts": [SchListOf(SchPost)]
+    })
+    
+    def view(name: str):
+        return {
+            "posts": Post.get_posts_of_user_by_name(name)
+        }
 
-    @app.route("/api/v1/posts/most_recent/<n>")
-    def api_v1_get_recent_posts(n: int):
-        return Post.get_most_recent_posts(n)
+class v1_GetRecentPosts(SchEndpoint):
+    method = "GET"
+    path = "/api/v1/posts/most_recent/<n>"
+    
+    codes = [200]
+    
+    res = Content({
+        "posts": [SchListOf(SchPost)]
+    })
+    
+    def view(n: int):
+        return {
+            "posts": Post.get_most_recent_posts(n)
+        }
+
+def create_endpoints(app):
+    v1_PostCreate.register_to(app)
+    v1_UserGetPosts.register_to(app)
+    v1_GetRecentPosts.register_to(app)
+
+def all_endpoints():
+    return [
+        v1_PostCreate,
+        v1_GetRecentPosts,
+        v1_UserGetPosts
+    ]
 
 def create_post(auth: str, content: str):
     with Session() as session:

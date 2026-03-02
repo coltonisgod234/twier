@@ -1,13 +1,25 @@
-from db.tables import Session, Post, Word, User
+from db.tables import Session, Word
+from routes.base import SchEndpoint
 from config.config import DICTIONARY
 from decimal import Decimal, getcontext
 
-# TODO: do a thing
+class v1_Progress(SchEndpoint):
+    method = "GET"
+    path = "/api/v1/progress"
+
+    res = {
+        "claims": {
+            "num": [int],
+            "max": [int],
+            "percente": [Decimal]
+        }
+    }
+    
+    def view():
+        return get_progress()
 
 def create_endpoints(app):
-    @app.route("/api/v1/progress")
-    def api_get_progress():
-        return get_progress()
+    v1_Progress.register_to(app)
 
 def get_progress():
     with Session() as session:

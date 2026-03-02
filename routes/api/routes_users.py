@@ -2,7 +2,7 @@ from flask import request, make_response
 from db import tables
 from dataclasses import dataclass
 import sqlalchemy
-from routes.base import SchEndpoint, SchError, SchOptional, Content, wrap_error_endpoint
+from routes.base import SchEndpoint, SchError, SchOptional, Content, wrap_error_endpoint, SchUser
 
 @dataclass
 class v1_UserAdd(SchEndpoint):
@@ -60,6 +60,8 @@ class v1_UserLogin(SchEndpoint):
         "token": [str]
     })
     
+    codes = [200, 401, 500]
+    
     def view(name: str):
         json = request.json
 
@@ -93,12 +95,21 @@ class v1_UserLogin(SchEndpoint):
             
         return tables.User.transaction_by_name(name, payload)
 
-def create_endpoints(app):
-    v1_UserAdd.register_to(app)
-    v1_UserLogin.register_to(app)
+@dataclass
+class v1_SessionLogout(SchEndpoint):
+    method = "POST"
+    path = "/api/v1/session/logout"
     
-    @app.route("/api/v1/session/logout", methods=["POST"])
-    def api1_session_logout():
+    req = None
+    res = Content({
+        "error": [SchError([])]
+    })
+    
+    codes = [200, 400, 500]  # TODO: might be wrong
+    
+    auth = "token"
+    
+    def view():
         token = request.authorization.token
         def payload(user: tables.User, session):
             user.logout()
@@ -112,14 +123,33 @@ def create_endpoints(app):
             "error": None,
         }
 
-    @app.route("/api/v1/users/<name>")
-    def api1_users_info(name: str):
+class v1_UserInfo(SchEndpoint):
+    method = "GET"
+    path = "/api/v1/users/<name>"
+    
+    res = wrap_error_endpoint([4], {
+        "info": [SchUser]
+    })
+    
+    codes = 404
+
+    def view(name: str):
         def payload(user: tables.User, _):
-            return user.to_dict_api()
+            return {
+                "info": user.to_dict_api()
+            }
 
         try: return tables.User.transaction_by_name(name, payload)
         except sqlalchemy.exc.NoResultFound:
             return make_response({
-                "error": "user not found",
-                "errornum": 4
+                "error": {
+                    "msg": "user not found",
+                    "num": 4
+                }
             }, 404)
+
+def create_endpoints(app):
+    v1_UserAdd.register_to(app)
+    v1_UserLogin.register_to(app)
+    v1_SessionLogout.register_to(app)
+    v1_UserInfo.register_to(app)

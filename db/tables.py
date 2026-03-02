@@ -109,7 +109,7 @@ class User(Base, APISafeProto):
             raise PermissionError
 
     @classmethod
-    def transaction_by_name(self, name: str, closure: Callable[[User, sessionmaker], None]):
+    def transaction_by_name(self, name: str, closure):
         with Session() as session:
             stmt = select(User) \
                 .where(User.name == name)
@@ -119,7 +119,7 @@ class User(Base, APISafeProto):
             return closure(user, session)
 
     @classmethod
-    def transaction_by_bearer(self, token: str, closure: Callable[[User, sessionmaker], None]):
+    def transaction_by_bearer(self, token: str, closure):
         with Session() as session:
             stmt = select(User) \
                 .where(User.session == token)
@@ -141,7 +141,7 @@ class User(Base, APISafeProto):
             else:
                 return true
 
-    def create_and_validate_post_object(self, content: str, session) -> Post:
+    def create_and_validate_post_object(self, content: str, session):
         '''
         creates, validates, and ensures soundness of a Post object.
         

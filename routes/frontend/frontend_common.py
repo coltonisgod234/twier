@@ -28,9 +28,6 @@ class UserSession:
     # something like "yo"
     greeting: str
 
-    # something like "dark" or "light"
-    theme: str
-
 @dataclass
 class FrontendData:
     session: UserSession
@@ -71,7 +68,6 @@ def get_frontend_data():
         session = UserSession(
             name = name,
             greeting = greeting,
-            theme = session.get("theme", default="original"),
         ),
     )
 

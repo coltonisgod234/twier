@@ -42,6 +42,7 @@ class User(Base, APISafeProto):
     posts: Mapped[list["Post"]] = relationship(
         back_populates="author",
         cascade="all, delete-orphan"  # I think I get why I need this a lil more now...
+        # me when the orphanage burns
     )
 
     def logout(self):
@@ -150,11 +151,11 @@ class User(Base, APISafeProto):
         
         Posts are always lowercase
         '''
-        if len(content.strip()) == 0:
-            raise IlligalContent
-
         content = content.lower()
         words = split_content_into_words(content)
+        
+        if len(words) == 0:
+            raise IlligalContent
 
         # ensure we can actually claim them
         from config import config

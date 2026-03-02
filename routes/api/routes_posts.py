@@ -100,7 +100,9 @@ def create_post(auth: str, content: str):
 
         except BannedWordsUsed as e:
             session.delete(user)
+            print("fucking deleting the user!                   *****")
             session.commit()
+            quit()
             raise e
         
         except IlligalContent as e:
